@@ -15,8 +15,12 @@
     --warn-bg: var(--figma-color-bg-warning-tertiary, #fff1e0);
     --ok: var(--figma-color-text-success, #14ae5c);
     --danger: var(--figma-color-text-danger, #e03e1a);
+    --danger-bg: var(--figma-color-bg-danger-tertiary, #ffe2e0);
+    --focus: var(--figma-color-border-selected, #0d99ff);
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  button:focus-visible, summary:focus-visible, .item:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   body { margin: 0; font: 11px/1.5 Inter, -apple-system, "Pretendard", "Noto Sans KR", sans-serif; color: var(--fg); background: var(--bg); }
   .wrap { padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 14px; min-height: 100vh; }
   h1 { font-size: 12px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
@@ -51,7 +55,7 @@
   details { border: 1px solid var(--line); border-radius: 8px; }
   summary { padding: 9px 12px; cursor: pointer; color: var(--sub); list-style: none; display: flex; justify-content: space-between; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: "▸"; transition: transform .12s; }
+  summary::after { content: ""; width: 12px; height: 12px; align-self: center; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4.5 2.5 8 6l-3.5 3.5' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; transition: transform .12s; }
   details[open] summary::after { transform: rotate(90deg); }
   .adv { padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -78,9 +82,11 @@
 
   /* 결과 */
   .res { display: flex; flex-direction: column; gap: 8px; }
-  .res.stale { opacity: .45; }
+  .res.stale > :not(.stale-note) { opacity: .45; }
+  .stale-note { color: var(--sub); font-size: 10px; }
   .done { display: flex; align-items: center; gap: 8px; }
-  .done .ic { width: 18px; height: 18px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 11px; flex: none; }
+  .done .ic { width: 18px; height: 18px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; flex: none; }
+  .done .ic svg { width: 10px; height: 10px; }
   .done.warn .ic { background: var(--warn); }
   .done .txt { flex: 1; min-width: 0; }
   .fixrow { display: flex; align-items: center; gap: 8px; }
@@ -96,14 +102,14 @@
   .group.closed .items { display: none; }
   .item { padding: 6px 10px; border-top: 1px solid var(--line); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item:hover { background: var(--hover); }
-  .err { color: var(--danger); background: var(--warn-bg); border-radius: 6px; padding: 8px 10px; }
-  .foot { margin-top: auto; color: var(--dim); font-size: 10px; text-align: center; }
+  .err { color: var(--danger); background: var(--danger-bg); border-radius: 6px; padding: 8px 10px; }
+  .foot { margin-top: auto; color: var(--sub); font-size: 10px; text-align: center; }
 </style>
 
 <div class="wrap">
   <h1>
     <svg viewBox="0 0 128 128" aria-hidden="true"><rect width="128" height="128" rx="28" fill="#16181d"/><rect x="22" y="30" width="66" height="46" rx="6" fill="none" stroke="#fff" stroke-width="7"/><path d="M44 92h22" stroke="#fff" stroke-width="7" stroke-linecap="round"/><rect x="72" y="50" width="34" height="56" rx="7" fill="#16181d" stroke="#2f8cff" stroke-width="7"/></svg>
-    사이즈 변환 <span class="badge">v3.42</span>
+    사이즈 변환 <span class="badge">v3.43</span>
   </h1>
 
   <div>
@@ -130,7 +136,7 @@
     <div class="adv">
       <div class="row">
         <div>바뀐 값에 디자인 시스템 다시 연결<div class="hint">끄면 바뀐 값을 숫자로만 넣어요. 이미 연결된 변수는 그대로 바뀌어요</div></div>
-        <button class="sw" id="linkSw" aria-label="바뀐 값에 디자인 시스템 다시 연결"></button>
+        <button class="sw" id="linkSw" role="switch" aria-checked="true" aria-label="바뀐 값에 디자인 시스템 다시 연결"></button>
       </div>
     </div>
   </details>
@@ -150,6 +156,8 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const post = m => parent.postMessage({ pluginMessage: m }, '*');
   const NAME = { '375': '375', '750': '750', 'PC': 'PC' };
+  const ICON_OK = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2 4.1 7.3 8 2.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_WARN = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 2v3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="5" cy="8" r=".9" fill="currentColor"/></svg>';
   let current = null, selId = null, target = null, busy = false, busyLint = false, resultId = null;
   let opts = { link: true };
 
@@ -163,9 +171,10 @@
     $('lint').disabled = !current || busy;
     $('go').innerHTML = busy ? `<span class="spin"></span>${busyLint ? '검사 중…' : '바꾸는 중…'}`
       : valid ? `${NAME[current]} → ${NAME[target]} 바꾸기`
-      : current === 'PC' ? 'PC 프레임은 다른 사이즈로 바꿀 수 없어요. 검사만 할 수 있어요' : current ? '사이즈를 골라 주세요' : '프레임을 선택해 주세요';
+      : current === 'PC' ? '바꿀 수 없는 프레임이에요' : current ? '사이즈를 골라 주세요' : '프레임을 선택해 주세요';
     $('pcNote').hidden = target !== 'PC';
     $('linkSw').classList.toggle('on', opts.link !== false);
+    $('linkSw').setAttribute('aria-checked', String(opts.link !== false));
   }
 
   const save = () => { post({ type: 'opts', opts }); render(); };
@@ -183,7 +192,7 @@
     const total = r.check.length + (r.more || 0);
     const failed = lint ? 0 : (r.errors || 0);
     const title = lint ? `${NAME[r.from]} 검사 완료` : failed ? `${NAME[r.from]} → ${NAME[r.to]} 일부 처리 실패` : `${NAME[r.from]} → ${NAME[r.to]} 완료`;
-    let html = `<div class="done${failed ? ' warn' : ''}"><div class="ic">${failed ? '!' : '✓'}</div><div class="txt"><b>${title}</b>${failed ? ` · 실패 ${failed}건` : ''}${total ? ` · 확인할 곳 ${total}곳` : ''}</div>${lint ? '' : '<button class="link" id="goRes">만든 프레임 보기</button>'}</div>`;
+    let html = `<div class="done${failed ? ' warn' : ''}"><div class="ic">${failed ? ICON_WARN : ICON_OK}</div><div class="txt"><b>${title}</b>${failed ? ` · 실패 ${failed}건` : ''}${total ? ` · 확인할 곳 ${total}곳` : ''}</div>${lint ? '' : '<button class="link" id="goRes">만든 프레임 보기</button>'}</div>`;
     if (lint && r.fixed) {
       const f = r.fixed, n = f.align + f.spacing + f.text + (f.layout || 0);
       html += `<div class="hint">${n ? `${n}곳 고쳤어요 (구조 ${f.layout || 0} · 정렬 ${f.align} · 간격 ${f.spacing} · 글자 ${f.text}) · 되돌리기 Cmd/Ctrl+Z` : '자동으로 고칠 수 있는 곳이 없었어요'}</div>`;
@@ -226,7 +235,7 @@
       }
       if (changed) {
         target = null; // 선택이 바뀌면 사이즈는 다시 고르게 (변환 직후 바로 또 변환되는 실수 방지)
-        if (m.id !== resultId) $('out').className = 'res stale';
+        if (m.id !== resultId && $('out').innerHTML.trim()) { $('out').className = 'res stale'; if (!$('out').querySelector('.stale-note')) $('out').insertAdjacentHTML('afterbegin', '<div class="stale-note">이전 프레임 결과예요</div>'); }
       }
       render();
     }
