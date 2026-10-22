@@ -1,4 +1,4 @@
-// ===== Amway Size Converter v3.41 =====
+// ===== Amway Size Converter v3.42 =====
 // 원칙
 //  1) 모드 전환 전 모든 크기 값을 기록 → 모드 전환 → 바뀐 값은 토큰이 처리한 것, 그대로인 값만 직접 변환
 //  2) 직접 변환한 값은 같은 값의 토큰(Spacing·Radius 변수, Publishing 텍스트 스타일)에 다시 연결 (기본값)
@@ -373,7 +373,7 @@ async function convertFrame(src, target, opts = {}) {
   const typoPairs = buildPairs(TYPO, from, target);
   const toPC = target === 'PC';
   const rep = { from, to: target, modes: [], spacing: 0, textValues: 0, sized: 0, rescaled: 0, linked: 0, linkedText: 0, unlinked: 0, errors: 0, check: [] };
-  const FAILURE = '이 레이어는 변환하지 못했어요';
+  const FAILURE = '이 레이어는 변환하지 못해 원래 크기 그대로예요. 직접 맞춰 주세요';
   const flag = (n, reason, failed = false) => {
     if (/guide/i.test(n.name) && !failed) return;
     const item = { id: n.id, name: n.name, reason, failed };
@@ -404,12 +404,12 @@ async function convertFrame(src, target, opts = {}) {
   // 2. 변환 전 상태 기록
 
   // 구조 정리 (복사본에서만): 화면 폭 HUG 섹션 → FILL, PC는 한 줄로 쌓인 자유 배치 → 오토레이아웃
-  for (const n of all) if (hugSection(n, S.root)) { try { n.layoutSizingHorizontal = 'FILL'; flag(n, '화면 폭 섹션이 내용 맞춤(HUG)이라 채우기(FILL)로 바꿨어요'); } catch (e) { } }
+  for (const n of all) if (hugSection(n, S.root)) { try { n.layoutSizingHorizontal = 'FILL'; flag(n, '화면 폭 섹션이 내용 맞춤이라 채우기로 바꿨어요'); } catch (e) { } }
   if (target === 'PC') {
     const frees = all.filter(n => n.type === 'FRAME' && n.layoutMode === 'NONE').reverse(); // 안쪽부터
     for (const f of frees) {
       let inInst = false; for (let a = f.parent; a && a !== clone; a = a.parent) if (a.type === 'INSTANCE') { inInst = true; break; }
-      if (!inInst && applyAutoLayout(f)) flag(f, '자유 배치를 오토레이아웃으로 바꿨어요 — 확인');
+      if (!inInst && applyAutoLayout(f)) flag(f, '자유 배치를 오토레이아웃으로 바꿨어요. 요소 위치가 원본과 같은지 봐 주세요');
     }
   }
 
@@ -549,7 +549,7 @@ async function convertFrame(src, target, opts = {}) {
   };
 
   const convertText = async (n, s) => {
-    if (n.hasMissingFont) { fail(n, '폰트가 없어 글자 크기를 못 바꿨어요'); return; }
+    if (n.hasMissingFont) { fail(n, '이 글자의 폰트가 없어 크기를 바꾸지 못했어요. 폰트를 설치한 뒤 다시 변환해 주세요'); return; }
     if (!s.segs) return;
     let changed = false, detached = false;
     for (const seg of s.segs) {
@@ -730,7 +730,7 @@ async function convertFrame(src, target, opts = {}) {
       const f = s.inPicture || Math.max(s.w, s.h) > 80 * S.dens ? gOf(s) : r;
       rescaleNode(n, f);
       if (!inAL && s.pW != null && p.type !== 'GROUP' && p.type !== 'BOOLEAN_OPERATION') mapPos(f);
-      if (toPC && !inAL && !s.inPicture) flag(n, '자유 배치 요소 — 위치 확인');
+      if (toPC && !inAL && !s.inPicture) flag(n, '자유 배치 요소라 위치를 비율로만 옮겼어요. 위치를 봐 주세요');
       if (target === 'PC' && inAL && !s.inPicture && s.w >= S.content * 0.8) flag(n, '그룹이라 콘텐츠 폭(960)으로 못 넓혔어요 — 프레임으로 바꾸면 자동으로 맞춰져요');
       return false;
     }
@@ -799,7 +799,7 @@ async function convertFrame(src, target, opts = {}) {
           if (h === 'FILL') n.layoutSizingHorizontal = 'FIXED';
           setW(n, PC_RULES.button);
           if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') p.counterAxisAlignItems = 'CENTER';
-          flag(n, '버튼 폭을 PC 칼럼에 맞췄어요 — 확인');
+          flag(n, '꽉 찬 버튼을 PC 버튼 폭(443)으로 줄였어요');
         } else if (h === 'FIXED') setW(n, Math.min(s.w * colK, textW(n))); // 칼럼 대비 비율 유지
         if (v === 'FIXED' && k !== 1) setH(n, s.h * k);
         return true;
@@ -816,7 +816,7 @@ async function convertFrame(src, target, opts = {}) {
             setW(n, s.w * s.selfK);
             if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') p.counterAxisAlignItems = 'CENTER';
           }
-          else if (bleed) { setW(n, innerW(p)); flag(n, '이미지 영역 — 배경만 넓혔어요. PC용 구성은 따로 확인'); }
+          else if (bleed) { setW(n, innerW(p)); flag(n, 'KV 배경만 1376으로 넓혔어요. 안의 구성은 750 그대로예요'); }
           else setW(n, Math.min(s.w * rImg, colW(n))); // 내용 칸 안의 그림 영역: 그림 크기 그대로 (넓히지 않음)
         }
         else if (freeFrame) { if (gOf(s) !== 1) setW(n, s.w * gOf(s)); } // 로고·썸네일 같은 그림 프레임: 높이와 같은 그림 배율로 (가로세로 비율 유지)
@@ -824,7 +824,7 @@ async function convertFrame(src, target, opts = {}) {
         else if (near(s.w, S.content) && s.pW && near(s.pW, S.root)) {
           if (target === 'PC') { // 모바일 내용 칼럼 → PC 내용 칼럼 폭으로, 1376 안 가운데
             setW(n, colW(n));
-            if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') { p.counterAxisAlignItems = 'CENTER'; flag(p, '가운데 정렬로 바꿨어요 — 원래 정렬 확인'); }
+            if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') { p.counterAxisAlignItems = 'CENTER'; flag(p, 'PC에 맞게 가운데 정렬로 바꿨어요. 원래 왼쪽 정렬이었다면 되돌려 주세요'); }
           } else setW(n, T.content);
         }
         else if (near(s.w, S.root)) setW(n, T.root);
@@ -903,7 +903,7 @@ async function convertFrame(src, target, opts = {}) {
     try {
       if (target === 'PC' && h === 'FILL' && !areas.has(n.id)) for (const c of n.children) if ('constraints' in c) { try { c.constraints = { horizontal: 'CENTER', vertical: c.constraints.vertical }; } catch (e) { } }
       if (h === 'FILL' && !areas.has(n.id)) n.layoutSizingHorizontal = 'FILL'; if (v === 'FILL') n.layoutSizingVertical = 'FILL'; // 이미지 중심 영역은 1097 고정
-    } catch (e) { fail(n, '채우기(FILL) 설정을 되돌리지 못했어요'); }
+    } catch (e) { fail(n, '채우기 설정을 되돌리지 못했어요. 이 레이어의 폭 설정을 확인해 주세요'); }
   }
   if (target === 'PC') flagLineBreaks(all, snap, flag);
   if (target === 'PC') applyPcRules(clone, flag, fail, modeOf, new Set(all.filter(n => near(snap.get(n.id).w, S.root, 2)).map(n => n.id)), snap, bgSecs, areas);
@@ -920,7 +920,7 @@ async function convertFrame(src, target, opts = {}) {
     const s = snap.get(n.id); if (!s || s.inInst || (s.pIn != null && s.w > s.pIn + 1)) continue; // 원본에서 일부러 칸보다 넓게 둔 요소는 그대로
     const inner = p.width - p.paddingLeft - p.paddingRight;
     if (inner > 0 && n.width > inner + 1) {
-      try { const ar = n.height / n.width; setW(n, inner); if (hasImage(n) || (n.type === 'FRAME' && n.layoutMode === 'NONE')) setH(n, inner * ar); flag(n, '부모보다 넓어서 폭을 맞췄어요 — 확인'); } catch (e) { }
+      try { const ar = n.height / n.width; setW(n, inner); if (hasImage(n) || (n.type === 'FRAME' && n.layoutMode === 'NONE')) setH(n, inner * ar); flag(n, '감싸는 프레임보다 넓어서 폭을 줄였어요. 잘린 내용이 없는지 봐 주세요'); } catch (e) { }
     }
   }
   fitHeights([clone, ...all], snap, rImg, flag, fail);
@@ -991,7 +991,7 @@ function fitHeights(all, snap, rImg, flag, fail) {
           const hz = n.layoutSizingHorizontal;
           n.layoutSizingVertical = 'HUG';
           if (n.layoutSizingHorizontal !== hz) try { n.layoutSizingHorizontal = hz; } catch (e) { } // 높이만 바꾸고 폭 설정(FILL 등)은 유지
-          flag(n, '내용이 넘쳐서 높이를 내용에 맞췄어요 (HUG)');
+          flag(n, '내용이 넘쳐서 높이를 내용 맞춤으로 바꿨어요');
         }
       } else if (n.type === 'FRAME' && n.layoutMode === 'NONE' && s.bottomSrc != null && n.children.length) {
         // 원본보다 '더' 아래로 내려간 만큼만 늘림 — 원래부터 프레임 밖으로 나간 장식(배경 원·줄자 등) 때문에 늘리지 않음
@@ -1000,7 +1000,7 @@ function fitHeights(all, snap, rImg, flag, fail) {
         const extra = bottom - s.bottomSrc * g;
         if (extra > 2 && n.height < half(s.h * g + extra) - 1) { setH(n, s.h * g + extra); flag(n, '아래 요소가 넘쳐서 높이를 늘렸어요'); }
       }
-    } catch (e) { fail(n, '높이를 맞추지 못했어요 — 확인'); }
+    } catch (e) { fail(n, '높이를 내용에 맞추지 못했어요. 글이 잘리지 않았는지 확인해 주세요'); }
   }
 }
 
@@ -1013,7 +1013,7 @@ function applyPcRules(root, flag, fail, modeOf, bands, snap, bgSecs, areas) {
       if (n.layoutSizingHorizontal === 'FILL') n.layoutSizingHorizontal = 'FIXED';
       setW(n, R.bg);
       const p = n.parent;
-      if (isAL(p) && n.layoutPositioning !== 'ABSOLUTE') { if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') { p.counterAxisAlignItems = 'CENTER'; flag(p, '가운데 정렬로 바꿨어요 — 원래 정렬 확인'); } }
+      if (isAL(p) && n.layoutPositioning !== 'ABSOLUTE') { if (p.layoutMode === 'VERTICAL' && p.counterAxisAlignItems !== 'CENTER') { p.counterAxisAlignItems = 'CENTER'; flag(p, 'PC에 맞게 가운데 정렬로 바꿨어요. 원래 왼쪽 정렬이었다면 되돌려 주세요'); } }
       else n.x = Math.round((p.width - n.width) / 2);
     } catch (e) { fail(n, '배경 이미지 섹션 폭을 못 바꿨어요'); }
   }
@@ -1027,7 +1027,7 @@ function applyPcRules(root, flag, fail, modeOf, bands, snap, bgSecs, areas) {
     const ar = c.height / c.width;
     if (c.layoutSizingHorizontal === 'FILL') c.maxWidth = w; else setW(c, w);
     if (hasImage(c)) setH(c, c.width * ar);
-    if (parent.layoutMode === 'VERTICAL' && parent.counterAxisAlignItems !== 'CENTER') { parent.counterAxisAlignItems = 'CENTER'; flag(parent, '가운데 정렬로 바꿨어요 — 원래 정렬 확인'); }
+    if (parent.layoutMode === 'VERTICAL' && parent.counterAxisAlignItems !== 'CENTER') { parent.counterAxisAlignItems = 'CENTER'; flag(parent, 'PC에 맞게 가운데 정렬로 바꿨어요. 원래 왼쪽 정렬이었다면 되돌려 주세요'); }
   };
   const limit = n => {
     if (!isAL(n)) return;
@@ -1039,7 +1039,7 @@ function applyPcRules(root, flag, fail, modeOf, bands, snap, bgSecs, areas) {
         if (c.width <= maxOf(c) + 1) continue;
         if (wideOf(c)) { if (c.type === 'TEXT') cap(c, R.wideText, n); else limit(c); continue; }
         cap(c, R.narrow, n);
-      } catch (e) { fail(c, '폭 정리를 못 했어요'); }
+      } catch (e) { fail(c, 'PC 폭으로 맞추지 못했어요. 이 레이어 폭을 직접 확인해 주세요'); }
     }
   };
   limit(root);
@@ -1080,8 +1080,8 @@ function applyPcRules(root, flag, fail, modeOf, bands, snap, bgSecs, areas) {
         if (c.type === 'INSTANCE' && typeof c.scaleFactor === 'number' && Math.abs(c.scaleFactor - 1) > 0.01) c.rescale(k);
         else { c.layoutSizingHorizontal = 'FIXED'; setW(c, w); fitInside(c); }
       }
-      flag(n, '반복 카드를 가로로 배치했어요 — 확인');
-    } catch (e) { fail(n, '카드 가로 배치를 못 했어요'); }
+      flag(n, '반복 카드를 가로로 놓았어요. 카드 순서가 맞는지 봐 주세요');
+    } catch (e) { fail(n, '카드를 가로로 놓지 못해 세로 그대로예요'); }
   }
 }
 
@@ -1249,11 +1249,11 @@ async function lintFrame(root) {
   const walk = async (n, inFree, depth) => {
     if (n.visible === false) return;
     if (n.type === 'TEXT' && !inFree) {
-      if (n.hasMissingFont) flag(n, '폰트가 설치되지 않았어요');
+      if (n.hasMissingFont) flag(n, '이 글자의 폰트가 없어 변환 때 크기를 바꿀 수 없어요. 폰트를 설치한 뒤 변환해 주세요');
       else if (n.characters.length) {
         for (const seg of n.getStyledTextSegments(['textStyleId', 'fontSize', 'fontName'])) {
-          if (!seg.textStyleId) { flag(n, '글자 스타일이 연결되지 않았어요', !!pubStyleKey(seg, size)); break; }
-          if (!/^Publishing\//.test(await styleName(seg.textStyleId))) { flag(n, 'Publishing이 아닌 글자 스타일이에요', !!pubStyleKey(seg, size)); break; }
+          if (!seg.textStyleId) { flag(n, '글자 스타일이 없어 변환 때 크기만 바뀌어요. Publishing 스타일을 연결해 주세요', !!pubStyleKey(seg, size)); break; }
+          if (!/^Publishing\//.test(await styleName(seg.textStyleId))) { flag(n, 'Publishing 스타일이 아니라 변환 때 스타일 연결이 끊겨요. Publishing 스타일로 바꿔 주세요', !!pubStyleKey(seg, size)); break; }
         }
       }
       return;
@@ -1266,7 +1266,7 @@ async function lintFrame(root) {
       else flag(n, '자유 배치 프레임 — 요소가 겹치거나 간격이 제각각이라 PC에선 그림처럼 커져요');
     }
     if (size === 'PC' && bgPC.has(n.id) && !near(n.width, PC_RULES.bg, 2)) flag(n, `배경 이미지 섹션인데 폭이 ${Math.round(n.width)}이에요 — 배경은 ${PC_RULES.bg} (KV만 1376, 예외는 이름에 [넓게])`);
-    if (hugSection(n, S.root)) flag(n, '화면 폭 섹션이 내용 맞춤(HUG)이에요 — 채우기(FILL)로 바꿔야 사이즈 변환 때 안 깨져요', true);
+    if (hugSection(n, S.root)) flag(n, '화면 폭 섹션이 내용 맞춤이에요. 채우기로 바꿔야 사이즈 변환 때 안 깨져요', true);
     if (isAL(n) && !inFree) {
       const bv = n.boundVariables || {};
       const keys = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'itemSpacing'];
@@ -1275,12 +1275,12 @@ async function lintFrame(root) {
       if (size !== 'PC' && depth <= 1 && near(n.width, S.root, 2)) {
         const pl = n.paddingLeft, pr = n.paddingRight;
         const textAtEdge = pl === 0 && n.children.some(c => c.type === 'TEXT' && c.visible !== false);
-        if (!marginOK(pl) || !marginOK(pr) || textAtEdge) flag(n, `좌우 여백이 ${S.margin}이 아니에요`);
+        if (!marginOK(pl) || !marginOK(pr) || textAtEdge) flag(n, `좌우 여백이 ${S.margin}이 아니에요. 규격(750: 30, 375: 15)에 맞추면 변환 때 여백이 정확해요`);
       }
     }
     if (size !== 'PC' && !inFree && !isFree) {
       const hit = misAligned(n, S);
-      if (hit) for (const c of hit) flag(c, '보기엔 가운데인데 정렬이 가운데가 아니에요 — 가운데 정렬로 바꿔도 모양은 같아요. 안 바꾸면 PC에서 한쪽으로 쏠려요', true);
+      if (hit) for (const c of hit) flag(c, '보기엔 가운데지만 정렬 설정은 가운데가 아니에요. PC에서 한쪽으로 쏠리니 가운데 정렬로 바꿔 주세요(모양은 그대로예요)', true);
     }
     for (const c of n.children) await walk(c, inFree || isFree, depth + 1);
   };
