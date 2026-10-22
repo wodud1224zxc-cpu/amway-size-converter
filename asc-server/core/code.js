@@ -1,4 +1,4 @@
-// ===== Amway Size Converter v3.42 =====
+// ===== Amway Size Converter v3.43 =====
 // 원칙
 //  1) 모드 전환 전 모든 크기 값을 기록 → 모드 전환 → 바뀐 값은 토큰이 처리한 것, 그대로인 값만 직접 변환
 //  2) 직접 변환한 값은 같은 값의 토큰(Spacing·Radius 변수, Publishing 텍스트 스타일)에 다시 연결 (기본값)
