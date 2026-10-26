@@ -1,4 +1,4 @@
-// ===== Amway Size Converter v3.43 =====
+// ===== Amway Size Converter v3.44 =====
 // 원칙
 //  1) 모드 전환 전 모든 크기 값을 기록 → 모드 전환 → 바뀐 값은 토큰이 처리한 것, 그대로인 값만 직접 변환
 //  2) 직접 변환한 값은 같은 값의 토큰(Spacing·Radius 변수, Publishing 텍스트 스타일)에 다시 연결 (기본값)
@@ -464,7 +464,19 @@ async function convertFrame(src, target, opts = {}) {
   const areas = new Set();
   if (target === 'PC') {
     const f = findBgSections(clone, S.root);
-    const kvId = f.kv && f.kv.id;
+    let kvId = f.kv && f.kv.id;
+    if (!kvId) { // 배경 이미지 판정이 안 되면: 맨 위의 화면 폭 자유 배치 영역(글 있음)을 KV로
+      const top = all.filter(n => n.type === 'FRAME' && n.layoutMode === 'NONE' && !snap.get(n.id).inPicture && near(snap.get(n.id).w, S.root, 2) && n.findOne(d => d.type === 'TEXT'))
+        .sort((a, b) => a.absoluteTransform[1][2] - b.absoluteTransform[1][2])[0];
+      kvId = top && top.id;
+    }
+    // KV: 그림처럼 750 모드로 고정하지 않고 PC 모드 사용 — 글자·간격은 PC 기준으로 작아지고, 글 묶음 위치는 위/아래 가장자리 기준으로 다시 잡음
+    const kvNode = kvId && all.find(n => n.id === kvId);
+    if (kvNode) {
+      const ks = snap.get(kvId); ks.kv = true; ks.kvRoot = true;
+      for (const d of kvNode.findAll(() => true)) { const ds = snap.get(d.id); if (ds) ds.kv = true; }
+      for (const c of kvNode.children) { const cs = snap.get(c.id); if (cs && (c.type === 'TEXT' || (isAL(c) && c.findOne(d => d.type === 'TEXT')))) cs.kvFlow = true; }
+    }
     for (const n of all) {
       const s = snap.get(n.id);
       if (n.type !== 'FRAME' || n.layoutMode !== 'NONE' || !isAL(n.parent) || s.inInst || s.inPicture || n.id === kvId || modeOf.get(n.id) === 'wide') continue;
@@ -511,7 +523,7 @@ async function convertFrame(src, target, opts = {}) {
   const picSize = rImg !== r ? (PC_RULES.imageScale === 2 ? '750' : '375') : null;
   if (picSize) for (const n of all) {
     const s = snap.get(n.id);
-    if (s.selfK || s.areaK) continue; // 이미지 중심 영역은 글자를 PC 크기표(PC 스타일)로 바꾸므로 750 모드로 고정하지 않음 — 고정하면 PC 스타일이 750 값으로 풀려 스타일이 떨어짐
+    if (s.selfK || s.areaK || s.kv) continue; // 이미지 중심 영역은 글자를 PC 크기표(PC 스타일)로 바꾸므로 750 모드로 고정하지 않음 — 고정하면 PC 스타일이 750 값으로 풀려 스타일이 떨어짐
     const root = n.type === 'FRAME' && n.layoutMode === 'NONE' && !s.inPicture;
     const inner = s.inPicture && n.explicitVariableModes && Object.keys(n.explicitVariableModes).length;
     if (!root && !inner) continue;
@@ -535,13 +547,13 @@ async function convertFrame(src, target, opts = {}) {
   const conv = (n, s, k, fn, kind) => {
     const was = s.num[k];
     if (was == null || was === 0 || !(k in n)) return false;
-    if (n[k] !== was && !s.inPicture) return false; // 토큰이 이미 처리
+    if (n[k] !== was && (!s.inPicture || s.kv)) return false; // 토큰이 이미 처리
     const v = fn(was);
     if (n[k] === v) return false; // 이미 목표 값이면 토큰 연결 그대로 유지
     const wasBound = !!(n.boundVariables && n.boundVariables[k]);
     try { if (wasBound) n.setBoundVariable(k, null); } catch (e) { }
     n[k] = v;
-    if (linker && !s.inPicture) {
+    if (linker && (!s.inPicture || s.kv)) {
       const ok = kind === 'spacing' ? linker.spacing(n, k, was, v) : kind === 'radius' ? linker.radius(n, k, v) : false;
       if (!ok && wasBound) rep.unlinked++;
     } else if (wasBound) rep.unlinked++;
@@ -555,7 +567,7 @@ async function convertFrame(src, target, opts = {}) {
     for (const seg of s.segs) {
       const a = seg.start, b = seg.end;
       const curFS = n.getRangeFontSize(a, b);
-      if (s.inPicture && !s.areaK) { // 그림 안 텍스트: 그림 배율로 (이미지 중심 영역 안 글자는 PC 크기표)
+      if (s.inPicture && !s.areaK && !s.kv) { // 그림 안 텍스트: 그림 배율로 (이미지 중심 영역 안 글자는 PC 크기표)
         const nfs = half(seg.fontSize * rImg);
         if (curFS === nfs) continue; // 고정한 모드로 이미 맞음 → 스타일 유지
         unbindRange(n, a, b, 'fontSize'); n.setRangeFontSize(a, b, nfs); changed = true;
@@ -603,7 +615,7 @@ async function convertFrame(src, target, opts = {}) {
         if (linker && T.margin) linker.spacing(n, k, S.margin, T.margin);
       }
     }
-    const sp = s.inPicture ? (v => half(v * gOf(s))) : (v => interp(spPairs, v));
+    const sp = s.inPicture && !s.kv ? (v => half(v * gOf(s))) : (v => interp(spPairs, v)); // KV 안 글 묶음 간격은 PC 표대로
     const rr = s.inPicture ? gOf(s) : r;
     if (isAL(n)) {
       for (const k of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'itemSpacing'])
@@ -867,6 +879,17 @@ async function convertFrame(src, target, opts = {}) {
     // 부모(이미지 영역)가 PC 섹션 폭으로 넓어졌으면: 배경 레이어만 늘리고, 내용 묶음은 그림 크기 그대로 가운데
     const fullW = isFullW();
     const container = ['FRAME', 'INSTANCE', 'COMPONENT', 'SLOT'].includes(n.type);
+    if (s.kvFlow) { // KV 안 글 묶음: 위쪽 절반은 위 기준, 아래쪽 절반은 아래 기준으로 (글이 작아져도 사진과의 거리 유지)
+      if (n.type === 'TEXT' && n.textAutoResize !== 'WIDTH_AND_HEIGHT' && g !== 1) setW(n, s.w * g);
+      const ps = snap.get(p.id), top = s.y + s.h / 2 < ps.h / 2;
+      const calc = () => {
+        const x = half((s.x + s.w / 2) * g + (p.width - s.pW * g) / 2 - n.width / 2);
+        const y = top ? half(s.y * g) : half(p.height - (ps.h - s.y - s.h) * g - n.height);
+        return [x, y];
+      };
+      const [x, y] = calc(); place(n, x, y, calc);
+      return n.type !== 'TEXT';
+    }
     if (n.type === 'TEXT' || isAL(n) || (container && fullW)) {
       if (fullW) setW(n, pWn - (s.pW - s.w) * g); // 부모보다 살짝 넓거나 좁은 차이도 유지
       else if (n.type !== 'TEXT' || n.textAutoResize !== 'WIDTH_AND_HEIGHT') {
