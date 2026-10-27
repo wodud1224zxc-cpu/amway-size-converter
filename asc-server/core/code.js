@@ -1,4 +1,4 @@
-// ===== Amway Size Converter v3.44 =====
+// ===== Amway Size Converter v3.45 =====
 // 원칙
 //  1) 모드 전환 전 모든 크기 값을 기록 → 모드 전환 → 바뀐 값은 토큰이 처리한 것, 그대로인 값만 직접 변환
 //  2) 직접 변환한 값은 같은 값의 토큰(Spacing·Radius 변수, Publishing 텍스트 스타일)에 다시 연결 (기본값)
@@ -933,7 +933,16 @@ async function convertFrame(src, target, opts = {}) {
   if (target === 'PC') fillRows(all, snap, flag);
   // 폭 정리가 모두 끝난 뒤, 직접 배치 요소 위치를 최종 부모 폭 기준으로 다시 계산 (가운데였던 것은 가운데로)
   await new Promise(res => setTimeout(res, 0));
+  // KV 높이: 글 묶음이 줄어든 만큼 KV도 줄임 (위쪽 글이 줄어든 만큼 배경·사진은 위로 당김 → 제품과 글 사이 거리 유지)
+  const kvAdj = [];
+  if (target === 'PC') for (const n of all) {
+    const s = snap.get(n.id); if (!s || !s.kvRoot || n.removed) continue;
+    let dTop = 0, dBot = 0;
+    for (const c of n.children) { const cs = snap.get(c.id); if (!cs || !cs.kvFlow) continue; const d = cs.h * rImg - c.height; if (d <= 0) continue; if (cs.y + cs.h / 2 < s.h / 2) dTop += d; else dBot += d; }
+    if (dTop + dBot > 1) { try { setH(n, n.height - dTop - dBot); kvAdj.push([n, dTop]); flag(n, `KV 높이를 글이 줄어든 만큼 줄였어요 (${Math.round(dTop + dBot)}px)`); } catch (e) { } }
+  }
   for (const [n, calc] of positions) { try { if (n.removed) continue; const [x, y] = calc(); if (Math.abs(n.x - x) > 0.01 || Math.abs(n.y - y) > 0.01) { n.x = x; n.y = y; } } catch (e) { } }
+  for (const [n, dTop] of kvAdj) for (const c of n.children) { const cs = snap.get(c.id); if (cs && !cs.kvFlow && dTop) c.y -= dTop; }
   if (target === 'PC') for (const id of bgSecs) { const n = clone.findOne(d => d.id === id); if (n) try { fitBgLayers(n, snap); } catch (e) { fail(n, '배경 이미지를 섹션 폭에 못 맞췄어요'); } }
   // 마지막 안전장치: 세로 묶음 안에서 부모 안쪽 폭보다 넓은 고정 폭 요소는 부모 폭으로 (칸 밖으로 넘침 방지)
   await new Promise(res => setTimeout(res, 0)); // Figma가 바뀐 폭(FILL 등)을 다시 계산할 틈
